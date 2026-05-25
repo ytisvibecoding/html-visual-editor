@@ -1,0 +1,90 @@
+{
+  "executive-navy": {
+    "name_zh": "🔵 深海商务",
+    "vars": {
+      "--accent": "#1B4D7A",
+      "--accent-soft": "#E8F1F8",
+      "--warm": "#C9953C",
+      "--warm-soft": "#FDF4E4",
+      "--gold": "#9A6B00",
+      "--bg": "#FFFFFF",
+      "--ink": "#1A2B3C",
+      "--ink-2": "#5A6B7C",
+      "--ink-3": "#8A9BAC"
+    }
+  },
+  "linear-dusk": {
+    "name_zh": "🟣 幕光紫",
+    "vars": {
+      "--accent": "#5E6AD2",
+      "--accent-soft": "#2A2D45",
+      "--warm": "#9B8AFF",
+      "--warm-soft": "#1E1E28",
+      "--gold": "#FBBF24",
+      "--bg": "#131316",
+      "--ink": "#E8E8ED",
+      "--ink-2": "#8B8B9A",
+      "--ink-3": "#5E5E6E",
+      "--line": "#2E2E38",
+      "--line-2": "#1E1E28"
+    }
+  },
+  "notion-journal": {
+    "name_zh": "📒 手帐暖白",
+    "vars": {
+      "--accent": "#D97756",
+      "--accent-soft": "#FBF3EE",
+      "--warm": "#6B8F71",
+      "--warm-soft": "#EEF4EC",
+      "--gold": "#D4A844",
+      "--bg": "#FAF9F6",
+      "--ink": "#37352F",
+      "--ink-2": "#6B6B5E",
+      "--ink-3": "#9B9B8E"
+    }
+  },
+  "arc-gradient": {
+    "name_zh": "🌈 彩虹弧光",
+    "vars": {
+      "--accent": "#7C5CFC",
+      "--accent-soft": "#F0ECFF",
+      "--warm": "#F97066",
+      "--warm-soft": "#FFF0EF",
+      "--gold": "#F59E0B",
+      "--bg": "#FEFCFF",
+      "--ink": "#2D1B4E",
+      "--ink-2": "#6B5A85",
+      "--ink-3": "#9B8AB5"
+    }
+  },
+  "moss-earth": {
+    "name_zh": "🌿 苔藓大地",
+    "vars": {
+      "--accent": "#5C7A56",
+      "--accent-soft": "#EEF4EC",
+      "--warm": "#C67A4A",
+      "--warm-soft": "#FBF0E8",
+      "--gold": "#A07B3E",
+      "--bg": "#FAFAF7",
+      "--ink": "#2C3527",
+      "--ink-2": "#5E6B58",
+      "--ink-3": "#8E9B88"
+    }
+  },
+  "raycast-noir": {
+    "name_zh": "🔥 炭火暗夜",
+    "vars": {
+      "--accent": "#FF6363",
+      "--accent-soft": "#2D2020",
+      "--warm": "#60A5FA",
+      "--warm-soft": "#1A2030",
+      "--gold": "#FBBF24",
+      "--bg": "#161618",
+      "--ink": "#EBEBEF",
+      "--ink-2": "#A0A0B0",
+      "--ink-3": "#707080",
+      "--line": "#2A2A30",
+      "--line-2": "#1E1E24"
+    }
+  }
+}
