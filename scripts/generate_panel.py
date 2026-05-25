@@ -66,7 +66,7 @@ TEXT_COLOR_PREFIXES = {'ink', 'text', 'line', 'border'}
 # ============================================================
 SEMANTIC_ALIAS = {
     # 主色调系列
-    '--accent':      ['--accent', '--primary', '--blue', '--theme', '--main', '--brand'],
+    '--accent':      ['--accent', '--primary', '--brand', '--blue', '--theme', '--main'],
     '--accent-soft': ['--accent-soft', '--accent-light', '--primary-light', '--blue-light', '--theme-light'],
     # 暖色 / 强调
     '--warm':        ['--warm', '--orange', '--accent-2', '--secondary', '--red'],
@@ -98,7 +98,8 @@ SEMANTIC_ALIAS = {
 def _map_preset_to_host_vars(preset_vars: dict, host_var_names: set) -> dict:
     """
     把语义命名的 preset 映射到 host 实际变量名。
-    优先级：完全同名 > SEMANTIC_ALIAS 候选。
+    优先级：完全同名 > SEMANTIC_ALIAS 候选 > 前缀模式匹配。
+    v16: 增加第三轮前缀模式匹配，支持 --text-xxxx / --bg-xxxx / --line-xxxx / --theme-xxxx 等命名。
     """
     mapped = {}
     used_targets = set()  # 避免一个 host 变量被多个 preset 变量映射
@@ -119,6 +120,42 @@ def _map_preset_to_host_vars(preset_vars: dict, host_var_names: set) -> dict:
                 mapped[candidate] = val
                 used_targets.add(candidate)
                 break
+
+    # 第三轮：v16 新增 — 前缀模式匹配
+    # 将 preset 语义角色映射到 host 变量前缀
+    PRESET_ROLE_TO_HOST_PREFIX = {
+        '--accent':      ('--theme-', '--bg-', '--brand-'),
+        '--accent-soft': ('--theme-', '--bg-'),
+        '--warm':        ('--theme-', '--bg-'),
+        '--warm-soft':   ('--bg-'),
+        '--gold':        ('--theme-', '--bg-'),
+        '--gold-soft':   ('--bg-'),
+        '--ink':         ('--text-'),
+        '--ink-2':       ('--text-'),
+        '--ink-3':       ('--text-'),
+        '--line':        ('--line-', '--stroke-'),
+        '--line-2':      ('--line-'),
+        '--bg':          ('--bg-'),
+        '--bg-card':     ('--bg-'),
+        '--success':     ('--theme-', '--bg-'),
+        '--danger':      ('--theme-', '--bg-'),
+        '--sage':        ('--theme-', '--bg-'),
+        '--sage-soft':   ('--bg-'),
+    }
+
+    # 收集尚未映射的 host 变量
+    unmapped_host = [v for v in sorted(host_var_names) if v not in used_targets]
+    # 对每个未映射的 preset 变量，按角色前缀匹配
+    for var, val in preset_vars.items():
+        if var in mapped:
+            continue
+        prefixes = PRESET_ROLE_TO_HOST_PREFIX.get(var, ())
+        if not prefixes:
+            continue
+        for host_var in unmapped_host:
+            if any(host_var.startswith(p) for p in prefixes) and host_var not in used_targets:
+                mapped[host_var] = val
+                used_targets.add(host_var)
 
     return mapped
 
@@ -495,6 +532,8 @@ def _build_size_sliders(parse_result, scan_result, label_for) -> list:
     每条规则生成一个 slider（去重 / 验证 / 跳过编辑器自身选择器）。
     """
     from bs4 import BeautifulSoup
+    # _html 是 scan_dom 时的 HTML 快照（包含 gradient + solid 预处理后的变量替换，
+    # 但不含最终注入的编辑器代码）。用于 DOM 验证——检查 CSS 选择器是否匹配实际元素。
     html_src = scan_result._html if hasattr(scan_result, '_html') else ''
     soup = BeautifulSoup(html_src, 'html.parser') if html_src else None
 

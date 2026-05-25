@@ -214,6 +214,302 @@ def extract_gradient_hex_to_vars(html_content: str) -> tuple:
     return modified_html, new_vars
 
 
+# ============================================================
+# v16 新增: 非渐变颜色属性中硬编码 hex 提取为 CSS 变量
+# ============================================================
+
+# 颜色相关 CSS 属性
+_COLOR_PROPERTIES = frozenset({
+    'color', 'background', 'background-color',
+    'border-color', 'border', 'border-top-color', 'border-bottom-color',
+    'border-left-color', 'border-right-color',
+    'outline-color', 'outline',
+    'fill', 'stroke',
+    'box-shadow', 'text-shadow',
+    'text-decoration-color', 'column-rule-color', 'caret-color',
+})
+
+# 编辑器自身的选择器关键字（跳过不提取）
+_EDITOR_SELECTOR_KEYWORDS = (
+    'toolbar', 'panel', 'edit-', 'color-row', 'color-swatch', 'color-label',
+    'slider-row', 'slider-label', 'slider-val', 'slider-name',
+    'preset-row', 'preset-btn', 'save-indicator', 'edit-hint',
+    'html-visual-editor',
+)
+
+# 属性 → 变量前缀映射
+_PROP_TO_PREFIX = {
+    'color': '--text',
+    'text-decoration-color': '--text',
+    'caret-color': '--text',
+    'background': '--bg',
+    'background-color': '--bg',
+    'border-color': '--line',
+    'border': '--line',
+    'border-top-color': '--line',
+    'border-bottom-color': '--line',
+    'border-left-color': '--line',
+    'border-right-color': '--line',
+    'outline-color': '--line',
+    'outline': '--line',
+    'fill': '--fill',
+    'stroke': '--stroke',
+    'box-shadow': '--shadow',
+    'text-shadow': '--shadow',
+    'column-rule-color': '--line',
+}
+
+# 属性 → 角色分类（用于 generate_panel 的 _classify_color_section）
+_PROP_TO_ROLE = {
+    'color': 'text',
+    'text-decoration-color': 'text',
+    'caret-color': 'text',
+    'background': 'bg',
+    'background-color': 'bg',
+    'border-color': 'line',
+    'border': 'line',
+    'border-top-color': 'line',
+    'border-bottom-color': 'line',
+    'border-left-color': 'line',
+    'border-right-color': 'line',
+    'outline-color': 'line',
+    'outline': 'line',
+    'fill': 'bg',
+    'stroke': 'line',
+    'box-shadow': 'bg',
+    'text-shadow': 'bg',
+    'column-rule-color': 'line',
+}
+
+
+def _is_editor_selector(selector: str) -> bool:
+    """判断选择器是否属于编辑器自身（不应对其提取颜色变量）"""
+    sel_low = selector.lower()
+    return any(kw in sel_low for kw in _EDITOR_SELECTOR_KEYWORDS)
+
+
+def _infer_solid_var_name(hex_val: str, roles: set, existing_vars: set, used_names: set, counter: dict) -> str:
+    """
+    根据颜色值和角色推断语义化变量名。
+    roles: {'text', 'bg', 'line', 'shadow', 'fill', 'stroke'} 的子集
+    """
+    # 混合用途 → --theme-N
+    if len(roles) > 1:
+        prefix = '--theme'
+    elif 'text' in roles:
+        prefix = '--text'
+    elif 'bg' in roles:
+        prefix = '--bg'
+    elif 'line' in roles:
+        prefix = '--line'
+    elif 'fill' in roles:
+        prefix = '--fill'
+    elif 'stroke' in roles:
+        prefix = '--stroke'
+    elif 'shadow' in roles:
+        prefix = '--shadow'
+    else:
+        prefix = '--color'
+
+    # 用 hex 后4位做辨识（避免纯递增数字，让变量名更有信息量）
+    hex_suffix = hex_val.lstrip('#')[-4:].lower()
+    candidate = f'{prefix}-{hex_suffix}'
+
+    # 如果有冲突，加数字后缀
+    if candidate in existing_vars or candidate in used_names:
+        i = 2
+        candidate = f'{prefix}-{hex_suffix}-{i}'
+        while candidate in existing_vars or candidate in used_names:
+            i += 1
+            candidate = f'{prefix}-{hex_suffix}-{i}'
+
+    return candidate
+
+
+def extract_solid_hex_to_vars(html_content: str) -> tuple:
+    """
+    v16: 把宿主 CSS 里非渐变颜色属性中硬编码的 hex 提取为 :root 变量。
+
+    与 extract_gradient_hex_to_vars 互补：
+    - gradient 版处理渐变中的 hex
+    - 本函数处理 color / background / border 等属性中的 hex
+
+    返回 (修改后的 html_content, new_vars_dict {var_name: hex_value})
+    """
+    SKIP_HEX = {'#fff', '#ffffff', '#000', '#000000'}
+
+    # 找到所有 <style>...</style> 块
+    style_blocks = list(re.finditer(r'(<style[^>]*>)(.*?)(</style>)', html_content, re.DOTALL | re.IGNORECASE))
+    if not style_blocks:
+        return html_content, {}
+
+    # 先收集 :root 已有变量，避免命名冲突
+    existing_vars = set()
+    for m in re.finditer(r'(--[\w-]+)\s*:', html_content):
+        existing_vars.add(m.group(1))
+
+    new_vars = {}       # var_name -> hex_value
+    used_var_names = set()
+    counter = {}        # prefix -> count（备用）
+
+    # 第一遍：收集所有颜色 hex 的使用信息（同色合并）
+    # hex_normalized -> {roles: set, selectors: list, occurrences: [(style_idx, rule_start, rule_end, prop, hex_pos_in_prop_val)]}
+    hex_info = {}
+
+    for sb_idx, sb in enumerate(style_blocks):
+        block_content = sb.group(2)
+        rule_pattern = re.compile(r'([^{}@/]+?)\s*\{([^{}]*?)\}', re.DOTALL)
+
+        for rule_match in rule_pattern.finditer(block_content):
+            selector = rule_match.group(1).strip()
+            body = rule_match.group(2)
+
+            # 跳过 :root / @规则 / 编辑器选择器
+            if ':root' in selector or selector.startswith('@') or _is_editor_selector(selector):
+                continue
+
+            # 跳过含 var() 的属性值（已有变量引用，不需提取）
+            for prop_match in re.finditer(r'([\w-]+)\s*:\s*([^;]+)', body):
+                prop_name = prop_match.group(1).strip().lower()
+                prop_value = prop_match.group(2).strip()
+
+                if prop_name not in _COLOR_PROPERTIES:
+                    continue
+                # 跳过渐变值（已由 extract_gradient_hex_to_vars 处理）
+                if 'gradient' in prop_value.lower():
+                    continue
+                # 跳过已含 var() 的值
+                if 'var(' in prop_value:
+                    continue
+
+                # 找该属性值中的 hex
+                for hex_m in re.finditer(r'#[0-9a-fA-F]{3,8}\b', prop_value):
+                    hex_val = hex_m.group(0)
+                    hex_low = hex_val.lower()
+
+                    # 跳过极端色
+                    if hex_low in SKIP_HEX:
+                        continue
+
+                    # 标准化：3位 → 6位
+                    if len(hex_low) == 4:
+                        normalized = '#' + ''.join(c * 2 for c in hex_low[1:])
+                    else:
+                        normalized = hex_low
+
+                    role = _PROP_TO_ROLE.get(prop_name, 'bg')
+
+                    if normalized not in hex_info:
+                        hex_info[normalized] = {
+                            'roles': set(),
+                            'selectors': [],
+                            'occurrences': [],
+                        }
+                    hex_info[normalized]['roles'].add(role)
+                    hex_info[normalized]['selectors'].append(selector)
+
+    if not hex_info:
+        return html_content, {}
+
+    # 第二遍：为每个唯一 hex 分配变量名
+    hex_to_var = {}  # normalized_hex -> var_name
+    for hex_norm, info in sorted(hex_info.items(), key=lambda x: -len(x[1]['occurrences'])):
+        var_name = _infer_solid_var_name(hex_norm, info['roles'], existing_vars, used_var_names, counter)
+        used_var_names.add(var_name)
+        # 存储值用大写
+        stored_val = hex_norm.upper()
+        new_vars[var_name] = stored_val
+        hex_to_var[hex_norm] = var_name
+
+    # 第三遍：替换 CSS 中的 hex 为 var()
+    modified_html = html_content
+    offset_delta = 0
+
+    for sb_idx, sb in enumerate(style_blocks):
+        block_start = sb.start(2) + offset_delta
+        block_end = sb.end(2) + offset_delta
+        original_block = modified_html[block_start:block_end]
+        new_block = original_block
+
+        rule_pattern = re.compile(r'([^{}@/]+?)\s*\{([^{}]*?)\}', re.DOTALL)
+        replacements = []
+        rule_var_assignments = []
+
+        for rule_match in rule_pattern.finditer(new_block):
+            selector = rule_match.group(1).strip()
+            body = rule_match.group(2)
+
+            if ':root' in selector or selector.startswith('@') or _is_editor_selector(selector):
+                continue
+
+            new_body = body
+            body_modified = False
+
+            for prop_match in re.finditer(r'([\w-]+)\s*:\s*([^;]+)', body):
+                prop_name = prop_match.group(1).strip().lower()
+                prop_value = prop_match.group(2).strip()
+
+                if prop_name not in _COLOR_PROPERTIES:
+                    continue
+                if 'gradient' in prop_value.lower():
+                    continue
+                if 'var(' in prop_value:
+                    continue
+
+                # 找该属性值中的 hex 并替换
+                prop_replacements = []
+                for hex_m in re.finditer(r'#[0-9a-fA-F]{3,8}\b', prop_value):
+                    hex_val = hex_m.group(0)
+                    hex_low = hex_val.lower()
+                    if hex_low in SKIP_HEX:
+                        continue
+                    if len(hex_low) == 4:
+                        normalized = '#' + ''.join(c * 2 for c in hex_low[1:])
+                    else:
+                        normalized = hex_low
+
+                    var_name = hex_to_var.get(normalized)
+                    if var_name:
+                        # 记录变量赋值（去重）
+                        if (var_name, new_vars[var_name]) not in rule_var_assignments:
+                            rule_var_assignments.append((var_name, new_vars[var_name]))
+                        prop_replacements.append((hex_m.group(0), f'var({var_name})'))
+
+                if prop_replacements:
+                    new_prop_value = prop_value
+                    for old_hex, new_var_ref in prop_replacements:
+                        new_prop_value = new_prop_value.replace(old_hex, new_var_ref, 1)
+                    new_body = new_body.replace(prop_value, new_prop_value, 1)
+                    body_modified = True
+
+            if body_modified:
+                old_rule_text = rule_match.group(0)
+                new_rule_text = old_rule_text.replace(body, new_body, 1)
+                replacements.append((old_rule_text, new_rule_text))
+
+        # 应用替换
+        for find_str, replace_str in replacements:
+            new_block = new_block.replace(find_str, replace_str, 1)
+
+        # 把新变量插到 :root 块
+        if rule_var_assignments:
+            root_match = re.search(r':root\s*\{([^}]*)\}', new_block)
+            extra = ''
+            for vn, vv in rule_var_assignments:
+                extra += f'\n    {vn}: {vv};'
+            if root_match:
+                new_root_body = root_match.group(1).rstrip() + extra + '\n  '
+                new_root = f':root {{{new_root_body}}}'
+                new_block = new_block[:root_match.start()] + new_root + new_block[root_match.end():]
+            else:
+                new_block = f':root {{{extra}\n  }}\n' + new_block
+
+        if new_block != original_block:
+            modified_html = modified_html[:block_start] + new_block + modified_html[block_end:]
+            offset_delta += len(new_block) - len(original_block)
+
+    return modified_html, new_vars
+
 
 @dataclass
 class InjectResult:

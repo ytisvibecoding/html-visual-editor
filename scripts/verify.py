@@ -528,7 +528,9 @@ def check_appB15_injection_order(html: str, constants: dict) -> CheckItem:
 
 
 def check_appB16_color_tab_sections(html: str, constants: dict) -> CheckItem:
-    """appB16: 颜色 tab 至少有 2 个 .panel-section"""
+    """appB16: 颜色 tab 至少有 2 个 .panel-section
+    v16: 降级为 warning — 当只有 1 个 section 时 passed=True 但标记 warning，
+    不阻断输出（极少数 HTML 可能确实只有 1 组颜色）"""
     color_tab_match = re.search(
         r'id="tab-colors"(.*?)(?=id="tab-presets"|<div class="panel-tab-content"[^>]*id="tab-presets")',
         html, re.DOTALL
@@ -539,8 +541,9 @@ def check_appB16_color_tab_sections(html: str, constants: dict) -> CheckItem:
     ct = color_tab_match.group(1)
     section_count = ct.count('class="panel-section"')
     if section_count < 2:
-        return CheckItem('颜色tab多section', 'appB16', False,
-                       f'ERROR [appB16]: 颜色 tab 只有 {section_count} 个 section（应 >= 2）')
+        # v16: warning 模式 — passed=True 但 message 标注 warning
+        return CheckItem('颜色tab多section', 'appB16', True,
+                       f'WARNING [appB16]: 颜色 tab 只有 {section_count} 个 section（建议 >= 2，但不阻断）')
     return CheckItem('颜色tab多section', 'appB16', True, f'PASS ({section_count} sections)')
 
 
@@ -647,7 +650,7 @@ def check_appB20_data_editable_coverage(html: str, constants: dict) -> CheckItem
 
 
 def check_appB21_size_slider_coverage(html: str, constants: dict) -> CheckItem:
-    """appB21: 字号 slider 数 >= host font-size 规则数 * 0.8 (v15)"""
+    """appB21: 字号 slider 数 >= host font-size 规则数 * 0.8 (v16: 排除 CSS 死代码)"""
     try:
         from bs4 import BeautifulSoup
     except ImportError:
@@ -663,15 +666,29 @@ def check_appB21_size_slider_coverage(html: str, constants: dict) -> CheckItem:
     sliders = size_tab.select('.slider-row')
     slider_count = len(sliders)
 
-    # 数 host CSS 中 font-size 规则（排除编辑器自身样式）
-    # editor-core.css 包含在 <style id="html-visual-editor-css">
+    # 数 host CSS 中 font-size 规则（排除编辑器自身样式 + CSS 死代码）
+    # v16 修复: 只计有对应 DOM 元素的规则
     fs_rule_count = 0
     for style_tag in soup.find_all('style'):
         if style_tag.get('id') == 'html-visual-editor-css':
             continue
         css = style_tag.string or ''
-        # 简化: 每条 'font-size:' 算一条规则
-        fs_rule_count += len(re.findall(r'font-size\s*:', css))
+        # 解析每条 CSS 规则，检查 DOM 中是否有对应元素
+        for rule_match in re.finditer(r'([^{}@/]+?)\s*\{([^{}]*?)\}', css, re.DOTALL):
+            selector = rule_match.group(1).strip()
+            body = rule_match.group(2)
+            if selector.startswith('@') or ':root' in selector:
+                continue
+            if 'font-size' not in body:
+                continue
+            # 检查 DOM 中是否有对应元素
+            try:
+                matching = soup.select(selector)
+                if matching:
+                    fs_rule_count += 1
+            except Exception:
+                # 无效选择器，跳过
+                continue
 
     if fs_rule_count == 0:
         return CheckItem('字号slider覆盖率', 'appB21', True,

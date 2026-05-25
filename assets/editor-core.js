@@ -430,15 +430,8 @@ function applyPreset(name) {
 }
 
 /** Known safe clamp bounds for each size variable
-    NOTE: clamp max MUST exceed slider max, or clamp() caps the value silently */
-var SIZE_BOUNDS = window.SIZE_BOUNDS = window.SIZE_BOUNDS || {
-    '--title-size': { min: '2rem',   max: '12rem' },
-    '--h2-size':    { min: '1.4rem', max: '10rem' },
-    '--body-size':  { min: '0.75rem', max: '4rem' },
-    '--small-size': { min: '0.65rem', max: '3rem'  },
-    '--stat-size':  { min: '1rem',    max: '10rem' },
-    '--hero-size':  { min: '2rem',    max: '16rem' },
-};
+    v16: 完全由 Python 动态生成并通过 window.SIZE_BOUNDS 注入 */
+var SIZE_BOUNDS = window.SIZE_BOUNDS = window.SIZE_BOUNDS || {};
 
 // =====================================================
 //    ✦✦✦  REVERSE MAPPING: PAGE ELEMENT → PANEL CONTROL  ✦✦✦
@@ -447,122 +440,10 @@ var SIZE_BOUNDS = window.SIZE_BOUNDS = window.SIZE_BOUNDS || {
 
 /**
  * Page element class → list of panel controls (multiple dimensions per element)
- * 每个元素可能在多个维度上被调整：颜色 + 字号 + 布局
- * ⚠️ 此处所有 row 文案 MUST 与面板里实际存在的 slider-name / color-label 一字不差！
- * 顺序按重要性排列，悬浮提示会并列列出
+ * v16: 硬编码金版 PEM 已移除，完全由 Python 动态生成并通过 window.PAGE_ELEMENT_TO_PANEL 注入
+ * 如果 Python 未注入（极罕见），使用空对象
  */
-var PAGE_ELEMENT_TO_PANEL = window.PAGE_ELEMENT_TO_PANEL = window.PAGE_ELEMENT_TO_PANEL || {
-    // ========== Slide 1: TITLE ==========
-    '.section-num':          [
-        { tab: '颜色', row: '强调色 Accent' },
-        { tab: '字号', row: '小字 Small' },
-    ],
-    '.main-title':           [
-        { tab: '字号', row: '主标题 Title' },
-        { tab: '颜色', row: '主文字 Text' },
-        { tab: '布局', row: '标题区 Title' },
-    ],
-    '.main-title .highlight':[
-        { tab: '颜色', row: '强调色 Accent' },
-        { tab: '字号', row: '主标题 Title' },
-    ],
-    '.subtitle':             [
-        { tab: '字号', row: '正文 Body' },
-        { tab: '颜色', row: '次要文字 Secondary' },
-        { tab: '布局', row: '副标题 Subtitle' },
-    ],
-    '.title-card':           [
-        { tab: '颜色', row: '卡片底色 Card BG' },
-    ],
-    '.score-label':          [
-        { tab: '字号', row: '小字 Small' },
-        { tab: '颜色', row: '卡内反色 On-Card' },
-    ],
-    '.score-big':            [
-        { tab: '字号', row: '超大数字 Hero（封面分数）' },
-        { tab: '颜色', row: '卡内反色 On-Card' },
-    ],
-    '.verdict':              [
-        { tab: '颜色', row: '卡内反色 On-Card' },
-    ],
-
-    // ========== Slide 2: SCORECARD GRID ==========
-    '.grid-label':           [
-        { tab: '颜色', row: '强调色 Accent' },
-        { tab: '字号', row: '小字 Small' },
-    ],
-    '.grid-title':           [
-        { tab: '字号', row: '二级标题 H2' },
-        { tab: '颜色', row: '主文字 Text' },
-        { tab: '布局', row: '正文区 Body' },
-    ],
-    '.score-grid':           [
-        { tab: '布局', row: '卡片间距 Gap' },
-        { tab: '布局', row: '网格最大宽度' },
-    ],
-    '.score-card':           [
-        { tab: '布局', row: '卡片内边距 Padding' },
-        { tab: '布局', row: '卡片间距 Gap' },
-    ],
-    '.score-card-icon':      [
-        { tab: '颜色', row: '主文字 Text' },
-    ],
-    '.score-card-name':      [
-        { tab: '字号', row: '正文 Body' },
-        { tab: '颜色', row: '主文字 Text' },
-    ],
-    '.score-card-score':     [
-        { tab: '字号', row: '大数字 Stat（统计/评分）' },
-        { tab: '颜色', row: '安全绿 Safe' },
-        { tab: '颜色', row: '警告黄 Warn' },
-        { tab: '颜色', row: '危险红 Danger' },
-    ],
-    '.score-card-desc':      [
-        { tab: '字号', row: '小字 Small' },
-        { tab: '颜色', row: '次要文字 Secondary' },
-        { tab: '布局', row: '描述文字 Desc' },
-    ],
-    '.tag-safe':             [
-        { tab: '颜色', row: '安全绿 Safe' },
-    ],
-    '.tag-warn':             [
-        { tab: '颜色', row: '警告黄 Warn' },
-    ],
-    '.tag-danger':           [
-        { tab: '颜色', row: '危险红 Danger' },
-    ],
-
-    // ========== Slide 3: VERDICT ==========
-    '.verdict-badge':        [
-        { tab: '颜色', row: '安全绿 Safe' },
-        { tab: '字号', row: '小字 Small' },
-    ],
-    '.verdict-title':        [
-        { tab: '字号', row: '主标题 Title' },
-        { tab: '颜色', row: '主文字 Text' },
-    ],
-    '.verdict-subtitle':     [
-        { tab: '字号', row: '正文 Body' },
-        { tab: '颜色', row: '次要文字 Secondary' },
-        { tab: '布局', row: '正文区 Body' },
-    ],
-    '.verdict-stats':        [
-        { tab: '布局', row: '数字间距 Stats Gap' },
-    ],
-    '.stat-num':             [
-        { tab: '字号', row: '大数字 Stat（统计/评分）' },
-        { tab: '颜色', row: '强调色 Accent' },
-    ],
-    '.stat-label':           [
-        { tab: '字号', row: '小字 Small' },
-        { tab: '颜色', row: '次要文字 Secondary' },
-    ],
-
-    // ========== Navigation ==========
-    '.nav-dot':              [
-        { tab: '颜色', row: '强调色 Accent' },
-    ],
-};
+var PAGE_ELEMENT_TO_PANEL = window.PAGE_ELEMENT_TO_PANEL = window.PAGE_ELEMENT_TO_PANEL || {};
 
 /** Page element hover tooltip (reverse mapping) */
 let _pageTooltip = null;
@@ -860,7 +741,9 @@ function initPageElementHighlights() {
         if (_pageTooltip && _pageTooltip.contains(e.target)) return;
         if (e.target.closest('.edit-panel') || e.target.closest('.edit-toolbar')) return;
         // 点其它有映射的元素 → 重新固定到那里
-        const mapped = e.target.closest('[data-editable], .score-card, .nav-dot, .title-card, .verdict-stats, .stat-item, .score-grid, .grid-header, .verdict-badge');
+        // v16 修复: 动态生成 PEM 选择器列表，替代硬编码
+        const pemSelectors = Object.keys(PAGE_ELEMENT_TO_PANEL || {}).join(', ');
+        const mapped = e.target.closest('[data-editable]' + (pemSelectors ? ', ' + pemSelectors : ''));
         if (mapped) {
             const infoList = findPanelInfo(e.target);
             if (infoList && infoList.length > 0) {
@@ -887,44 +770,15 @@ function initPageElementHighlights() {
 /**
  * CSS var → page element selectors
  * Used for hover/click highlighting
- * 格式: "CSS变量名": "选择器1, 选择器2, ..."
+ * v16: 完全由 Python 动态生成并通过 window.CSS_VAR_TO_ELEMENTS 注入
  */
-var CSS_VAR_TO_ELEMENTS = window.CSS_VAR_TO_ELEMENTS = window.CSS_VAR_TO_ELEMENTS || {
-    // 强调色 Accent → 所有橙色调元素（标题前缀/标签/导航点）
-    '--accent':       '.section-num, .grid-label, .main-title .highlight, .nav-dot.active, .score-card-icon, .stat-num',
-
-    // 卡片底色 Card BG → title-card背景
-    '--card-bg':      '.title-card',
-
-    // 安全绿 Safe → 所有绿色文字元素
-    '--safe-green':   '.tag-safe, .verdict-badge, .verdict-badge::before',
-
-    // 警告黄 Warn → 警告标签
-    '--warn-yellow':  '.tag-warn',
-
-    // 危险红 Danger → 危险标签
-    '--danger-red':   '.tag-danger',
-
-    // 背景色 → 全局背景（仅在编辑模式下高亮body）
-    '--bg-primary':   'body',
-
-    // 主文字 → 主要文字（排除卡片内的反色文字）
-    '--text-primary': '.main-title, .score-card-name, .score-card-icon, .grid-title',
-
-    // 次要文字 → 辅助说明文字
-    '--text-secondary': '.subtitle, .score-card-desc, .verdict-subtitle, .stat-label',
-};
+var CSS_VAR_TO_ELEMENTS = window.CSS_VAR_TO_ELEMENTS = window.CSS_VAR_TO_ELEMENTS || {};
 
 /**
  * Layout slider target → human-readable label
- * Maps the slider's data-target selector to a friendly name
+ * v16: 完全由 Python 动态生成
  */
-var LAYOUT_TARGET_LABELS = window.LAYOUT_TARGET_LABELS = window.LAYOUT_TARGET_LABELS || {
-    '.title-left':           '主标题区',
-    '.subtitle':             '副标题',
-    '.grid-title, .verdict-subtitle': '正文区',
-    '.score-card-desc':      '评分卡描述',
-};
+var LAYOUT_TARGET_LABELS = window.LAYOUT_TARGET_LABELS = window.LAYOUT_TARGET_LABELS || {};
 
 /* Track active highlight + tooltip */
 let _activeHighlightEls = [];
@@ -1038,14 +892,8 @@ function initPanelHighlights() {
         slider.closest('.slider-row').addEventListener('mouseover', () => {
             const labelEl = slider.closest('.slider-row').querySelector('.slider-name');
             const label = labelEl ? labelEl.textContent.trim() : varName;
-            // Highlight all elements that inherit this CSS var (approximate via tag + class)
-            const varMap = {
-                '--title-size':  '.main-title, .title-left, .verdict-title',
-                '--h2-size':     'h2, .grid-title',
-                '--body-size':   '.subtitle, .verdict-subtitle, .score-card-desc',
-                '--small-size':  '.score-label, .section-num, .grid-label, .tag-safe, .tag-warn, .tag-danger, .verdict-badge',
-            };
-            const selector = varMap[varName] || 'p, span, div';
+            // v16: 优先使用 Python 注入的 CSS_VAR_TO_ELEMENTS，fallback 到通用选择器
+            const selector = CSS_VAR_TO_ELEMENTS[varName] || 'p, span, div';
             const els = [...document.querySelectorAll(selector.split(', '))].filter(el =>
                 !el.closest('.edit-panel') && !el.closest('.edit-toolbar')
             );
@@ -1096,11 +944,17 @@ function switchPanelTab(tabName) {
 
 /** Save state to localStorage */
 function saveToStorage() {
-    // Collect all CSS custom property overrides — 用 DEFAULT_COLORS 的 keys 而非硬编码
+    // Collect all CSS custom property overrides — 遍历面板中所有 .color-row 的 data-var
+    // v16 修复: 不再依赖 DEFAULT_COLORS keys，而是动态收集面板中实际存在的颜色变量
     const styles = {};
-    const varsToSave = (typeof DEFAULT_COLORS === 'object' && DEFAULT_COLORS)
-        ? Object.keys(DEFAULT_COLORS)
-        : ['--accent','--card-bg','--bg-primary','--text-primary','--text-secondary','--safe-green','--warn-yellow','--danger-red'];
+    const varsToSave = [];
+    document.querySelectorAll('.color-row input[type="color"]').forEach(ci => {
+        if (ci.dataset.var) varsToSave.push(ci.dataset.var);
+    });
+    // Fallback: 如果面板还没渲染完，用 DEFAULT_COLORS
+    if (varsToSave.length === 0 && typeof DEFAULT_COLORS === 'object' && DEFAULT_COLORS) {
+        varsToSave.push(...Object.keys(DEFAULT_COLORS));
+    }
     varsToSave.forEach(v => {
         const val = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
         if (val) styles[v] = val;
@@ -1123,7 +977,23 @@ function saveToStorage() {
         path: location.pathname || '',
     };
 
-    const state = { signature, styles, texts, savedAt: new Date().toISOString(), version: 2 };
+    // v16 新增: Collect size/layout slider states
+    const sliders = {};
+    document.querySelectorAll('.slider-row input[type="range"]').forEach(slider => {
+        const key = slider.dataset.target + '|' + slider.dataset.prop + '|' + (slider.dataset.var || '');
+        if (slider.value !== slider.defaultValue) {
+            sliders[key] = {
+                value: slider.value,
+                target: slider.dataset.target || '',
+                prop: slider.dataset.prop || '',
+                unit: slider.dataset.unit || '',
+                varName: slider.dataset.var || '',
+                displayId: (slider.closest('.slider-row').querySelector('.slider-val') || {}).id || '',
+            };
+        }
+    });
+
+    const state = { signature, styles, texts, sliders, savedAt: new Date().toISOString(), version: 3 };
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         showSaveIndicator(true);
@@ -1189,6 +1059,35 @@ function loadFromStorage() {
             editables.forEach((el, i) => {
                 if (state.texts['el_' + i] !== undefined) {
                     el.innerHTML = state.texts['el_' + i];
+                }
+            });
+        }
+
+        // v16 新增: Restore size/layout slider states
+        if (state.sliders) {
+            Object.values(state.sliders).forEach(s => {
+                // 如果是 CSS 变量方式 (varName 存在)
+                if (s.varName) {
+                    document.documentElement.style.setProperty(s.varName, s.value + (s.unit || ''));
+                }
+                // 如果是直接元素方式 (target + prop)
+                if (s.target) {
+                    const el = document.querySelector(s.target);
+                    if (el) {
+                        el.style[s.prop] = s.value + (s.unit || '');
+                    }
+                }
+                // 更新面板中的 slider 显示值
+                if (s.displayId) {
+                    const displayEl = document.getElementById(s.displayId);
+                    if (displayEl) displayEl.textContent = s.value + (s.unit || '');
+                }
+            });
+            // 同步所有 slider input 的值
+            document.querySelectorAll('.slider-row input[type="range"]').forEach(slider => {
+                const key = slider.dataset.target + '|' + slider.dataset.prop + '|' + (slider.dataset.var || '');
+                if (state.sliders[key]) {
+                    slider.value = state.sliders[key].value;
                 }
             });
         }

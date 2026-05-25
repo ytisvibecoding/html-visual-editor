@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from parse_css import parse_css_from_html, count_css_variables, get_color_vars
 from scan_dom import scan_dom
 from generate_panel import generate_panel
-from inject import inject, INJECT_BEGIN, extract_gradient_hex_to_vars
+from inject import inject, INJECT_BEGIN, extract_gradient_hex_to_vars, extract_solid_hex_to_vars
 from verify import run_all_checks
 
 
@@ -96,6 +96,10 @@ def main():
             sys.exit(1)
         else:
             print("检测到旧注入，将自动清理并重新注入...")
+            # v16 修复: --force 时立即清理旧注入，确保后续所有步骤在干净 HTML 上运行
+            from inject import _strip_old_injection
+            html_content = _strip_old_injection(html_content)
+            print("  旧注入已清理。")
 
     # v15 预处理: 把宿主 CSS 渐变里硬编码的 hex 提取为 :root 变量
     # 这样后续 parse_css 能识别它们为颜色变量并加进 DEFAULT_COLORS
@@ -104,6 +108,17 @@ def main():
         print(f"\n[预处理] 渐变提取: 新增 {len(_gradient_new_vars)} 个 CSS 变量")
         for vn, vv in _gradient_new_vars.items():
             print(f"    {vn}: {vv}")
+
+    # v16 预处理: 把宿主 CSS 里非渐变颜色属性中硬编码的 hex 提取为 :root 变量
+    html_content, _solid_new_vars = extract_solid_hex_to_vars(html_content)
+    if args.verbose and _solid_new_vars:
+        print(f"\n[预处理] 非渐变颜色提取: 新增 {len(_solid_new_vars)} 个 CSS 变量")
+        for vn, vv in _solid_new_vars.items():
+            print(f"    {vn}: {vv}")
+
+    _all_new_vars = {**_gradient_new_vars, **_solid_new_vars}
+    if _all_new_vars and args.verbose:
+        print(f"\n[预处理] 共新增 {len(_all_new_vars)} 个 CSS 变量")
 
     # 步骤 1：解析 CSS
     if args.verbose:
