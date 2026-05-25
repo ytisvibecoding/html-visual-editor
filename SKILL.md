@@ -1,5 +1,6 @@
 ---
 name: html-visual-editor
+version: "1.1.0"
 description: "把任意静态 HTML 转成可视化编辑版：注入工具栏、颜色/字号/布局/预设面板、就地文字编辑、撤销保存导出、元素与面板双向跳转。适用于用户说可编辑版HTML、html可视化编辑、让html可编辑、样式面板、改html不写代码、所见即所得、点击直接编辑、把报告/页面/演示稿变成可调样式。"
 agent_created: true
 ---

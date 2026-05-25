@@ -138,6 +138,24 @@ html-visual-editor/
     └── demo-report.html
 ```
 
+## 📝 Changelog
+
+### v1.1.0 (2025-05-25)
+
+- **Solid color extraction**: `extract_solid_hex_to_vars()` extracts hardcoded non-gradient colors (color/background/border) into CSS variables — color variable count increased from ~6 to ~30
+- **`--force` cleanup**: `--force` now strips old injection artifacts *before* parsing/scanning, preventing stale data leaks
+- **appB16 demoted to WARNING**: sections < 2 no longer fails the build; outputs a warning instead
+- **appB21 DOM-based verification**: uses `soup.select()` to validate DOM element existence, eliminating false positives from CSS-only references (dead code)
+- **Slider state persistence**: layout/font-size slider positions are saved to localStorage v3 format and restored on reload
+- **Complete color save/restore**: `saveToStorage()` iterates all `.color-row input[data-var]` instead of relying on hardcoded DEFAULT_COLORS keys
+- **Preset prefix matching**: `_map_preset_to_host_vars()` adds a 3rd-pass prefix pattern match (--text-N / --bg-N / --line-N) for better cross-file preset coverage
+- **Dynamic PEM (Panel-Element Mapping)**: removed all 17 hardcoded gold-edition selectors from `editor-core.js` (SIZE_BOUNDS, PAGE_ELEMENT_TO_PANEL, CSS_VAR_TO_ELEMENTS, LAYOUT_TARGET_LABELS now fall back dynamically)
+- **Source annotation**: `_html` parameter in `generate_panel.py` now documented as "scan_dom HTML snapshot"
+
+### v1.0.0 (2025-05-24)
+
+- Initial release — turn any static HTML into a visually editable page
+
 ## 🗺️ Roadmap
 
 - [ ] Image editing (replace/resize images from panel)
