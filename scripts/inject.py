@@ -336,7 +336,7 @@ def extract_solid_hex_to_vars(html_content: str) -> tuple:
 
     返回 (修改后的 html_content, new_vars_dict {var_name: hex_value})
     """
-    SKIP_HEX = {'#fff', '#ffffff', '#000', '#000000'}
+    SKIP_HEX = set()  # v1.3: 不再跳过 #fff/#000，让所有硬编码颜色进入变量体系
 
     # 找到所有 <style>...</style> 块
     style_blocks = list(re.finditer(r'(<style[^>]*>)(.*?)(</style>)', html_content, re.DOTALL | re.IGNORECASE))
@@ -530,14 +530,15 @@ def _read_asset(filename: str) -> str:
 def _strip_old_injection(html_content: str) -> str:
     """
     检测并清理旧的注入内容。
-    查找 html-visual-editor::BEGIN/END 标记对并删除中间所有内容。
+    查找所有 html-visual-editor::BEGIN/END 标记对并删除中间所有内容。
     """
-    # 使用正则匹配标记对（跨行）
     pattern = re.compile(
         re.escape(INJECT_BEGIN) + r'.*?' + re.escape(INJECT_END),
         re.DOTALL
     )
-    cleaned = pattern.sub('', html_content)
+    cleaned = html_content
+    while pattern.search(cleaned):
+        cleaned = pattern.sub('', cleaned)
     return cleaned
 
 

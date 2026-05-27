@@ -54,6 +54,10 @@ class ScanResult:
     css_var_to_elements: dict     # {var: "sel1, sel2"}        -- R8 字符串格式
     present_elements: dict = None  # {tag: computed_font_size}
     _html: str = ''               # 原始 HTML（用于布局 slider 解析 fallback）
+    # v1.8.0: 数据驱动颜色聚合
+    color_usage: dict = None      # {'text': [(hex, char_count, vars_pointing_here), ...],
+                                  #  'bg':   [(hex, elem_count, vars), ...],
+                                  #  'border':[(hex, elem_count, vars), ...]}
 
 
 def has_direct_text(el) -> bool:
@@ -384,7 +388,8 @@ def scan_dom(html_content: str, parse_result, label_for: dict = None) -> ScanRes
         page_element_to_panel=page_element_to_panel,
         css_var_to_elements=css_var_to_elements,
         present_elements=present_elements,
-        _html=html_content
+        _html=html_content,
+        color_usage=_aggregate_color_usage(soup, parse_result),
     )
 
 
@@ -407,3 +412,240 @@ def _selector_matches_element(elem_selector: str, target_selector: str, soup) ->
         if es_parts[-1] == ts_parts[-1]:
             return True
     return False
+
+
+# ============================================================
+# v1.8.0: 数据驱动颜色聚合 (todo38/39/44)
+# ============================================================
+HEX_RE = re.compile(r'#([0-9a-fA-F]{3,8})\b')
+RGB_RE = re.compile(r'rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s]+([\d.]+))?\s*\)')
+
+
+def _normalize_hex(s: str) -> str:
+    """从一段 CSS value 中提取 hex；支持 #abc / #abcdef / rgb()/rgba()。返回 #RRGGBB 或 ''。"""
+    if not s:
+        return ''
+    s = s.strip()
+    m = HEX_RE.search(s)
+    if m:
+        h = m.group(1)
+        if len(h) == 3:
+            h = ''.join(c * 2 for c in h)
+        elif len(h) >= 6:
+            h = h[:6]
+        else:
+            return ''
+        return '#' + h.upper()
+    m = RGB_RE.search(s)
+    if m:
+        r, g, b = int(float(m.group(1))), int(float(m.group(2))), int(float(m.group(3)))
+        return '#{:02X}{:02X}{:02X}'.format(r, g, b)
+    return ''
+
+
+def _hex_distance(a: str, b: str) -> float:
+    try:
+        ha = a.lstrip('#'); hb = b.lstrip('#')
+        if len(ha) >= 6 and len(hb) >= 6:
+            r1, g1, b1 = int(ha[0:2], 16), int(ha[2:4], 16), int(ha[4:6], 16)
+            r2, g2, b2 = int(hb[0:2], 16), int(hb[2:4], 16), int(hb[4:6], 16)
+            return ((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2) ** 0.5
+    except Exception:
+        pass
+    return 999.0
+
+
+def _build_selector_rule_index(parse_result):
+    """构造 {selector: properties} 缓存，方便按选择器找属性。"""
+    idx = {}
+    for rule in (parse_result.rules if parse_result else []):
+        sel = (rule.selector or '').strip()
+        if not sel:
+            continue
+        for sub in [s.strip() for s in sel.split(',') if s.strip()]:
+            idx.setdefault(sub, {}).update(rule.properties or {})
+    return idx
+
+
+def _resolve_var_to_hex(value: str, var_to_hex: dict, visited=None) -> str:
+    """递归解析 var(--xxx) 到最终 hex。"""
+    if visited is None: visited = set()
+    if not value:
+        return ''
+    val = value.strip()
+    # 直接是颜色
+    direct = _normalize_hex(val)
+    if direct:
+        return direct
+    # var(--xxx[, fallback])
+    m = re.search(r'var\(\s*(--[^\s,)]+)(?:\s*,\s*([^)]+))?\s*\)', val)
+    if m:
+        var_name = m.group(1)
+        if var_name in visited:
+            return ''
+        visited.add(var_name)
+        nxt = var_to_hex.get(var_name, '')
+        resolved = _resolve_var_to_hex(nxt, var_to_hex, visited)
+        if resolved:
+            return resolved
+        if m.group(2):
+            return _resolve_var_to_hex(m.group(2), var_to_hex, visited)
+    return ''
+
+
+def _element_matches_rule_selector(el, sel: str, soup) -> bool:
+    """简单判断 el 是否被 selector 命中。用 soup.select 做严格匹配。"""
+    try:
+        matched = soup.select(sel)
+        return el in matched
+    except Exception:
+        return False
+
+
+def _compute_prop_for_element(el, prop_name: str, sel_index: dict, var_to_hex: dict, soup):
+    """对 el 计算 prop_name 的最终 hex（粗略版 cascade）。
+    优先级：
+      1) inline style
+      2) host CSS 规则（按 selector specificity 简单估计：含 class/id 的规则优先）
+    返回 (hex, source_var_name)。
+    """
+    # 1) inline
+    style = el.get('style', '') if hasattr(el, 'get') else ''
+    if style:
+        for decl in style.split(';'):
+            if ':' not in decl:
+                continue
+            k, v = decl.split(':', 1)
+            if k.strip().lower() == prop_name:
+                resolved = _resolve_var_to_hex(v, var_to_hex)
+                if resolved:
+                    return resolved, ''  # inline 不挂任何变量
+    # 2) host CSS rules
+    # 找所有命中此元素的 selector，取最后定义、含 class/id 更优
+    matched_rules = []
+    for sel, props in sel_index.items():
+        if prop_name not in props:
+            continue
+        try:
+            if el in soup.select(sel):
+                # specificity 估计
+                spec = sel.count('.') + sel.count('#') * 2 + sel.count('[')
+                if sel.startswith('.') or sel.startswith('#'):
+                    spec += 1
+                matched_rules.append((spec, sel, props[prop_name]))
+        except Exception:
+            continue
+    if not matched_rules:
+        return '', ''
+    matched_rules.sort(key=lambda x: x[0], reverse=True)
+    raw_value = matched_rules[0][2]
+    resolved = _resolve_var_to_hex(raw_value, var_to_hex)
+    # 找 source var (如果值是 var(--x))
+    m = re.search(r'var\(\s*(--[^\s,)]+)', raw_value)
+    src_var = m.group(1) if m else ''
+    return resolved, src_var
+
+
+# 不参与统计的标签
+_SKIP_TAGS = {'script', 'style', 'link', 'meta', 'br', 'hr', 'svg', 'path',
+              'input', 'button', 'select', 'textarea', 'noscript', 'iframe', 'canvas'}
+
+
+def _aggregate_color_usage(soup, parse_result) -> dict:
+    """v1.8.0: 数据驱动颜色聚合
+
+    扫遍所有可见 DOM 节点，统计：
+      - text:  color 属性 → 按"该元素直接文字字符数"加权
+      - bg:    background-color → 按"元素出现次数"计（无法精确估面积）
+      - border:border-color / border-*-color → 按"元素出现次数"计
+
+    输出 {category: [(hex, weight, [source_vars]), ...]}（已按 weight 降序，做过 hex 距离 < 20 合并）
+    """
+    if not soup or not soup.body:
+        return {'text': [], 'bg': [], 'border': []}
+
+    # 构造 var_to_hex（递归解析）
+    var_to_hex = {}
+    if parse_result:
+        for v in parse_result.variables:
+            var_to_hex[v.name] = v.raw_value
+
+    sel_index = _build_selector_rule_index(parse_result)
+
+    text_buckets = {}    # {hex: [char_count, set(source_vars)]}
+    bg_buckets = {}
+    border_buckets = {}
+
+    # 限制扫描数量，防止超大 HTML 卡死
+    MAX_ELEMENTS_SCAN = 3000
+    count = 0
+    for el in soup.body.descendants:
+        if count >= MAX_ELEMENTS_SCAN:
+            break
+        name = getattr(el, 'name', None)
+        if not name:
+            continue
+        if name in _SKIP_TAGS:
+            continue
+        count += 1
+
+        # === 文字色 ===
+        # 只对"有直接文字"的节点统计
+        direct_text = ''
+        for child in el.children:
+            if isinstance(child, NavigableString) and not isinstance(child, type(soup).Comment if False else type(None)):
+                t = str(child).strip()
+                if t:
+                    direct_text += t
+        if direct_text:
+            char_count = len(direct_text)
+            hex_v, src_var = _compute_prop_for_element(el, 'color', sel_index, var_to_hex, soup)
+            if hex_v:
+                bucket = text_buckets.setdefault(hex_v, [0, set()])
+                bucket[0] += char_count
+                if src_var:
+                    bucket[1].add(src_var)
+
+        # === 背景色 ===
+        bg_hex, bg_var = _compute_prop_for_element(el, 'background-color', sel_index, var_to_hex, soup)
+        if not bg_hex:
+            # 试 background 简写
+            bg_hex, bg_var = _compute_prop_for_element(el, 'background', sel_index, var_to_hex, soup)
+        if bg_hex:
+            bucket = bg_buckets.setdefault(bg_hex, [0, set()])
+            bucket[0] += 1
+            if bg_var:
+                bucket[1].add(bg_var)
+
+        # === 边框色 ===
+        for bprop in ['border-color', 'border-top-color', 'border-bottom-color',
+                      'border-left-color', 'border-right-color', 'border']:
+            bd_hex, bd_var = _compute_prop_for_element(el, bprop, sel_index, var_to_hex, soup)
+            if bd_hex:
+                bucket = border_buckets.setdefault(bd_hex, [0, set()])
+                bucket[0] += 1
+                if bd_var:
+                    bucket[1].add(bd_var)
+                break
+
+    def _merge_and_sort(buckets: dict, threshold: float = 12.0):
+        # 按 weight 降序排
+        items = sorted(buckets.items(), key=lambda kv: -kv[1][0])
+        merged = []  # [(hex, weight, set(vars))]
+        for hx, (w, vs) in items:
+            placed = False
+            for i, (mh, mw, mv) in enumerate(merged):
+                if _hex_distance(hx, mh) < threshold:
+                    merged[i] = (mh, mw + w, mv | vs)  # 合并到已有代表
+                    placed = True
+                    break
+            if not placed:
+                merged.append((hx, w, set(vs)))
+        merged.sort(key=lambda x: -x[1])
+        return [(h, w, sorted(vs)) for h, w, vs in merged]
+
+    return {
+        'text':   _merge_and_sort(text_buckets),
+        'bg':     _merge_and_sort(bg_buckets),
+        'border': _merge_and_sort(border_buckets),
+    }

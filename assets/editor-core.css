@@ -61,22 +61,64 @@
            ✦✦✦  EDIT MODE TOOLBAR & PANEL  ✦✦✦
            ===================================================== */
 
-        /* --- Toolbar (top-left) --- */
+        /* --- Toolbar (default: top-right; draggable) --- */
         .edit-toolbar {
             position: fixed;
             top: clamp(0.75rem, 2vh, 1.5rem);
-            left: clamp(0.75rem, 2vw, 1.5rem);
+            right: clamp(0.75rem, 2vw, 1.5rem);
             z-index: 9999;
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 4px;
+            padding: 4px 4px 4px 10px;
             background: rgba(30, 30, 30, 0.85);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px;
+            user-select: none;
         }
+
+        /* Drag handle (left dots) */
+        .toolbar-drag-handle {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 3px;
+            padding: 8px 4px;
+            cursor: grab;
+            opacity: 0.5;
+            transition: opacity 0.2s ease;
+        }
+        .toolbar-drag-handle:hover { opacity: 1; }
+        .toolbar-drag-handle::before,
+        .toolbar-drag-handle::after {
+            content: '';
+            display: block;
+            width: 14px;
+            height: 2px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 1px;
+            box-shadow: 0 5px 0 rgba(255,255,255,0.6);
+        }
+        .edit-toolbar.dragging { cursor: grabbing; opacity: 0.92; }
+        .edit-toolbar.dragging .toolbar-drag-handle { cursor: grabbing; }
+
+        .toolbar-lang-btn {
+            min-width: 56px;
+            padding: 6px 10px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            opacity: 0.95;
+        }
+        .toolbar-lang-btn:hover { opacity: 1; }
+        /* v1.8.3 todo59: 中/EN 双显，激活态高亮 */
+        .lang-pair { display: inline-flex; align-items: center; gap: 4px; }
+        .lang-pair .lang-sep { opacity: 0.35; }
+        .lang-pair .lang-zh, .lang-pair .lang-en { opacity: 0.4; transition: opacity 0.15s; }
+        .lang-pair.zh-active .lang-zh { opacity: 1; }
+        .lang-pair.en-active .lang-en { opacity: 1; }
+
 
         .toolbar-btn {
             display: flex;
@@ -108,6 +150,27 @@
         }
 
         .toolbar-btn .btn-icon { font-size: 15px; }
+
+        /* Toolbar button with subtitle */
+        .btn-text-block {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .btn-text-main {
+            font-size: 12.5px;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+
+        .btn-text-sub {
+            font-size: 11px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.4);
+            line-height: 1.3;
+            max-width: 220px;
+        }
 
         /* Undo button — disabled state: visible but clearly inactive */
         .toolbar-btn:disabled,
@@ -211,6 +274,26 @@
             margin-bottom: 12px;
         }
 
+        .panel-section-hint {
+            font-size: 11px;
+            color: rgba(255,255,255,0.45);
+            line-height: 1.45;
+            margin-top: -6px;
+            margin-bottom: 12px;
+        }
+
+        /* v1.8.1 todo32: flow hint at preset card bottom */
+        .panel-section-flow-hint {
+            font-size: 11px;
+            color: rgba(255,255,255,0.55);
+            line-height: 1.5;
+            margin-top: 10px;
+            padding: 8px 10px;
+            background: rgba(255,255,255,0.04);
+            border-left: 2px solid rgba(255,255,255,0.25);
+            border-radius: 4px;
+        }
+
         /* Color row: label + swatch + input */
         .color-row {
             display: flex;
@@ -275,29 +358,60 @@
             border-color: var(--accent, #FF5722);
         }
 
-        /* Preset theme buttons */
+        /* Preset theme cards — Show, Don't Tell */
         .preset-row {
             display: flex;
-            gap: 6px;
+            gap: 8px;
             flex-wrap: wrap;
         }
 
-        .preset-btn {
-            padding: 5px 10px;
-            font-size: 11px;
-            font-weight: 500;
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 6px;
-            color: rgba(255,255,255,0.65);
+        .preset-card {
+            width: 120px;
+            border-radius: 8px;
+            overflow: hidden;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
+            border: 2px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
         }
 
-        .preset-btn:hover {
-            background: rgba(255,255,255,0.12);
-            color: #fff;
-            border-color: rgba(255,255,255,0.2);
+        .preset-card:hover {
+            transform: scale(1.04);
+            border-color: rgba(255,255,255,0.25);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        .preset-card.preset-card-active {
+            border-color: var(--accent, #FF5722);
+            box-shadow: 0 0 0 2px var(--accent, #FF5722), 0 4px 16px rgba(0,0,0,0.3);
+            transform: scale(1.04);
+        }
+
+        .preset-card-swatch {
+            display: flex;
+            height: 28px;
+        }
+
+        .preset-card-accent {
+            flex: 3;
+        }
+
+        .preset-card-warm {
+            flex: 1;
+        }
+
+        .preset-card-body {
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.3;
+        }
+
+        .preset-card-name {
+            display: block;
         }
 
         /* Slider row for numeric values */
@@ -356,6 +470,14 @@
             flex-direction: column;
             gap: 8px;
             flex-shrink: 0;
+        }
+
+        .panel-autosave-hint {
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            line-height: 1.4;
+            text-align: center;
+            padding: 4px 0 2px;
         }
 
         .action-btn {

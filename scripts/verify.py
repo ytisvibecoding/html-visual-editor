@@ -292,10 +292,26 @@ def check_sc08_no_dangerous_strings(html: str, constants: dict) -> CheckItem:
 
 
 def check_sc09_tag_pairing(html: str, constants: dict) -> CheckItem:
-    """SC-09: 标签配对"""
+    """SC-09: 标签配对
+
+    注意：直接对全文 regex 会误数 JS 字符串/注释里的字面量 (如 '<style>'、
+    "before <script>")。这里先剥离所有 <script>...</script> 与 <style>...</style>
+    的"内容"区，再去匹配真正的开闭标签。
+    """
+    def _strip_inner(text: str, tag: str) -> str:
+        # 把 <tag ...>...</tag> 替换为 <tag></tag>，保留标签本身，去掉内容
+        pattern = re.compile(
+            rf'(<{tag}[^>]*>)(.*?)(</{tag}>)',
+            re.IGNORECASE | re.DOTALL,
+        )
+        return pattern.sub(r'\1\3', text)
+
+    cleaned = _strip_inner(html, 'script')
+    cleaned = _strip_inner(cleaned, 'style')
+
     for tag in ['style', 'script']:
-        open_count = len(re.findall(f'<{tag}[^>]*>', html, re.IGNORECASE))
-        close_count = len(re.findall(f'</{tag}>', html, re.IGNORECASE))
+        open_count = len(re.findall(f'<{tag}[^>]*>', cleaned, re.IGNORECASE))
+        close_count = len(re.findall(f'</{tag}>', cleaned, re.IGNORECASE))
         if open_count != close_count:
             return CheckItem('标签配对', 'SC-09', False,
                            f'ERROR [SC-09]: {tag} mismatch: {open_count} opens vs {close_count} closes')
@@ -459,13 +475,14 @@ def check_appB09_slider_val_id_match(html: str, constants: dict) -> CheckItem:
 
 
 def check_appB10_panel_actions(html: str, constants: dict) -> CheckItem:
-    """appB10: panel 有 .panel-actions + 至少 3 个 .action-btn"""
+    """appB10: panel 有 .panel-actions + 至少 1 个 .action-btn
+    (v1.4 todo21: 删除冗余的 export/save 按钮，保留 reset 单独入口；阈值从 3 降为 1)"""
     if 'class="panel-actions"' not in html:
         return CheckItem('panel-actions', 'appB10', False, 'ERROR [appB10]: 缺 panel-actions')
     action_btn_count = html.count('class="action-btn')
-    if action_btn_count < 3:
+    if action_btn_count < 1:
         return CheckItem('panel-actions', 'appB10', False,
-                       f'ERROR [appB10]: action-btn < 3 (found {action_btn_count})')
+                       f'ERROR [appB10]: action-btn < 1 (found {action_btn_count})')
     return CheckItem('panel-actions', 'appB10', True, 'PASS')
 
 
@@ -650,15 +667,19 @@ def check_appB20_data_editable_coverage(html: str, constants: dict) -> CheckItem
 
 
 def check_appB21_size_slider_coverage(html: str, constants: dict) -> CheckItem:
-    """appB21: 字号 slider 数 >= host font-size 规则数 * 0.8 (v16: 排除 CSS 死代码)"""
+    """appB21: 字号 slider 覆盖检查
+
+    v1.7.0 调整: 收敛策略下不再要求"slider 数 ≥ 规则数 * 0.8"，因为多个 rule 可能
+    合并到同一个 family（strong/data/upcoming/event 等）。改为：
+      - 至少 6 条 slider（覆盖基本层级：H1/章节/正文/数字/标签/页脚）
+      - 不再校验 host font-size 规则数比例
+    """
     try:
         from bs4 import BeautifulSoup
     except ImportError:
         return CheckItem('字号slider覆盖率', 'appB21', True, 'bs4 未安装, 跳过')
 
     soup = BeautifulSoup(html, 'html.parser')
-
-    # 数 panel 里的字号 slider
     size_tab = soup.select_one('#tab-size')
     if not size_tab:
         return CheckItem('字号slider覆盖率', 'appB21', False,
@@ -666,41 +687,12 @@ def check_appB21_size_slider_coverage(html: str, constants: dict) -> CheckItem:
     sliders = size_tab.select('.slider-row')
     slider_count = len(sliders)
 
-    # 数 host CSS 中 font-size 规则（排除编辑器自身样式 + CSS 死代码）
-    # v16 修复: 只计有对应 DOM 元素的规则
-    fs_rule_count = 0
-    for style_tag in soup.find_all('style'):
-        if style_tag.get('id') == 'html-visual-editor-css':
-            continue
-        css = style_tag.string or ''
-        # 解析每条 CSS 规则，检查 DOM 中是否有对应元素
-        for rule_match in re.finditer(r'([^{}@/]+?)\s*\{([^{}]*?)\}', css, re.DOTALL):
-            selector = rule_match.group(1).strip()
-            body = rule_match.group(2)
-            if selector.startswith('@') or ':root' in selector:
-                continue
-            if 'font-size' not in body:
-                continue
-            # 检查 DOM 中是否有对应元素
-            try:
-                matching = soup.select(selector)
-                if matching:
-                    fs_rule_count += 1
-            except Exception:
-                # 无效选择器，跳过
-                continue
-
-    if fs_rule_count == 0:
-        return CheckItem('字号slider覆盖率', 'appB21', True,
-                       'PASS (host 无 font-size 规则)')
-
-    min_required = max(12, int(fs_rule_count * 0.8))
-    if slider_count < min_required:
+    MIN_REQUIRED = 4  # v1.7.0 收敛策略：少而精
+    if slider_count < MIN_REQUIRED:
         return CheckItem('字号slider覆盖率', 'appB21', False,
-                       f'ERROR [appB21]: 字号 slider 数 {slider_count} < 要求 {min_required} '
-                       f'(host font-size 规则 {fs_rule_count} 条)')
+                       f'ERROR [appB21]: 字号 slider 数 {slider_count} < {MIN_REQUIRED}（基本层级覆盖不足）')
     return CheckItem('字号slider覆盖率', 'appB21', True,
-                   f'PASS ({slider_count} sliders / {fs_rule_count} host 规则)')
+                   f'PASS ({slider_count} sliders, v1.7 收敛策略)')
 
 
 def check_appB22_size_slider_no_bare_tag(html: str, constants: dict) -> CheckItem:

@@ -193,22 +193,33 @@ def main():
 
     # 步骤 4.6 (P0-2 修复): 把布局 / 字号 slider 的 data-target 反向索引到 PEM，
     # 让 PEM 真正包含 '布局' / '字号' tab。
+    # v1.7.0: size slider 用收敛后的 display 版本，确保 PEM 中 row 直接是 friendly label
     from generate_panel import (
         _build_constants_js,
         _add_layout_targets_to_pem,
         _add_size_targets_to_pem,
+        collapse_pem_rows,
     )
     from bs4 import BeautifulSoup
     _pem_soup = BeautifulSoup(html_content, 'html.parser')
     _add_layout_targets_to_pem(panel_config.layout_sliders, scan_result.page_element_to_panel, _pem_soup)
-    _add_size_targets_to_pem(panel_config.size_sliders, scan_result.page_element_to_panel, _pem_soup)
+    _add_size_targets_to_pem(
+        panel_config.display_size_sliders or panel_config.size_sliders,
+        scan_result.page_element_to_panel,
+        _pem_soup,
+    )
+
+    # 步骤 4.7 (v1.7.0): 把 PEM 中所有 raw color/size row 改写为面板上显示的 friendly label
+    collapse_pem_rows(scan_result.page_element_to_panel, panel_config)
 
     # 重新用更新后的 scan_result 生成 constants_js
     panel_config.constants_js = _build_constants_js(
         panel_config.color_rows, panel_config.size_sliders,
         panel_config.preset_themes,
         scan_result.page_element_to_panel,
-        scan_result.css_var_to_elements
+        scan_result.css_var_to_elements,
+        color_var_to_rep=panel_config.color_var_to_rep,
+        size_target_to_family=panel_config.size_target_to_family,
     )
 
     if args.verbose:
