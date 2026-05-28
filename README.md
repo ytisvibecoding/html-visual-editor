@@ -1,62 +1,105 @@
 # html-visual-editor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
 [![Latest](https://img.shields.io/github/v/release/ytisvibecoding/html-visual-editor)](https://github.com/ytisvibecoding/html-visual-editor/releases)
 
-> **把任意静态 HTML 变成可视化编辑版 · 点文字直接改 · 调颜色字号布局 · 让 AI 帮你重塑样式 · 一键导出**
+**给 AI Agent 用的 Skill：把任意静态 HTML 变成可视化编辑版**
+**An AI Agent Skill: turn any static HTML into a visually editable page**
 
-> **Turn any static HTML into a visually editable page** — click to edit text, tweak colors/fonts/layout in a side panel, copy style prompts for AI to restyle, one-click clean export.
+点文字直接改 · 调颜色字号布局 · 复制风格 prompt 给 AI 重写 CSS · 一键导出干净 HTML
+Click-to-edit text · adjust colors/fonts/layout · copy style prompts for AI · clean one-click export
 
 ```text
-┌─── Page Content ────────────────────────────┐ ┌── Style Panel ──┐
-│  Click any text to edit                     │ │ Colors          │
-│  Hover element → see adjustable props       │ │ Style Prompts   │
-│  Press P to pin → swatch + value + extract  │ │ Layout          │
-│  Toolbar: Edit · Undo · Export · 中 / EN    │ │ Font Size       │
+┌─── 你的 HTML ───────────────────────────────┐ ┌── 样式面板 ─────┐
+│  Click any text to edit                     │ │ 颜色 Colors     │
+│  Hover → see adjustable props               │ │ 风格 Styles     │
+│  Press P to pin · swatch + value + extract  │ │ 布局 Layout     │
+│  Toolbar: 编辑 · 撤销 · 导出 · 中 / EN       │ │ 字号 Font Size  │
 └─────────────────────────────────────────────┘ └─────────────────┘
 ```
 
 ---
 
-## 🚀 30 秒上手 / Get started in 30s
+## ⚡ 怎么用 / How to use
 
-**需要 Python 3.9+ 和 `beautifulsoup4`，仅此而已 / Only requires Python 3.9+ and `beautifulsoup4`**
+**这是一个给 AI Agent 用的 skill**，你不用懂代码，**对你的 AI 说人话就行**：
+This is a skill for AI agents — you don't need to code. **Just talk to your AI in plain language:**
+
+```
+> 帮我把这个 HTML 做成可视化编辑版
+> Make this HTML visually editable
+> 给这份报告加个样式面板，我想调颜色和字号
+> Add a style panel to this page so I can tweak colors and fonts
+> 用 html-visual-editor 处理 ~/Downloads/report.html
+> Use html-visual-editor on ~/Downloads/report.html
+```
+
+AI 会自动调起这个 skill，跑完后你会拿到一个 `*-editable.html` 文件，直接双击打开就有工具栏和样式面板。
+Your agent will invoke this skill automatically; you'll get a `*-editable.html` file — open it and start editing visually.
+
+---
+
+## 📦 装到你的 AI Agent / Install into your AI agent
+
+### 选项 A：从 Skill 商店一键安装 / Install from a skill marketplace（推荐）
+
+- **[ClawHub](https://clawhub.ai/)** — 搜索 `html-visual-editor`，点 Install。
+- **CodeBuddy / WorkBuddy** — 在 skill marketplace 里搜索安装。
+
+装完直接对 agent 说："**帮我把这个 HTML 做成可编辑版**"。
+
+### 选项 B：让 AI 帮你手动装 / Let your AI install it manually
+
+对 AI 说这句话（一字不差复制即可）/ Copy this verbatim to your AI:
+
+> **请帮我安装这个 AI Agent skill：https://github.com/ytisvibecoding/html-visual-editor
+> 这是一个 html visual editor，让我可以用样式面板可视化编辑任意 HTML。
+> 请克隆仓库，并把整个目录拷贝到我当前 Agent 的 skills 路径下，命名为 `html-visual-editor`。
+> 装完告诉我怎么调用。**
+
+> **Please install this AI Agent skill: https://github.com/ytisvibecoding/html-visual-editor
+> It's an html-visual-editor that lets me visually edit any HTML through a style panel.
+> Clone the repo and copy the whole directory into my current agent's skills folder, named `html-visual-editor`.
+> Tell me how to invoke it after installing.**
+
+AI 会自动判断路径（WorkBuddy → `~/.workbuddy/skills/`，Claude Code → `~/.claude/skills/`，Cursor → 项目目录，等等）。
+The AI will figure out the right path (WorkBuddy → `~/.workbuddy/skills/`, Claude Code → `~/.claude/skills/`, Cursor → project dir, etc.).
+
+### 选项 C：脱开 Agent 直接命令行用 / Use directly from CLI (without an agent)
 
 ```bash
 git clone https://github.com/ytisvibecoding/html-visual-editor.git
 cd html-visual-editor
 pip install beautifulsoup4
-
-# 把你的 HTML 变成可视化编辑版 / Make your HTML visually editable
 python scripts/adapt.py /path/to/your-report.html
-
-# 打开生成的 *-editable.html，开始编辑 / Open the *-editable.html, start editing
 open /path/to/your-report-editable.html
 ```
 
-完成。`your-report-editable.html` 旁边会多出一个工具栏和右侧样式面板。
-Done. A toolbar and side panel will appear next to your report.
-
 ---
 
-## ✨ 能做什么 / What it does
+## ✨ 装好以后能做什么 / What you get after installing
 
 | | |
 |---|---|
-| 🖱️ **就地文字编辑** Inline text editing | 点页面任何文字直接改，支持撤销 / Click any text to edit; supports undo |
-| 🎨 **颜色面板** Color panel | 扫 DOM 实测用色，列出 top 5 文字色 / top 4 背景 / top 3 边框。蓝主题红主题绿主题都自动适配 / Scans the DOM, ranks colors by actual usage — works for any theme |
-| 🔤 **字号面板** Font-size panel | 自动归类 ≤10 项滑块，分 3 组（标题 / 正文 / 辅助）/ ≤10 sliders auto-grouped into Heading / Body / Auxiliary |
-| 📐 **布局面板** Layout panel | 7 项：页面宽度 / 内距 / 段落宽 / **行高** / 章节间距 / 卡片间距 / 卡片内距 / 7 sliders incl. Line Height |
-| 🎭 **6 张风格 Prompt 卡** Style Prompts | 点击 → 把"色板 + 氛围 + 硬约束"一整段 prompt 复制给 AI，让 AI 重写 CSS / Click → copy a complete style prompt to clipboard, paste to any AI |
-| 📌 **Pinned 元素弹窗** Pinned tooltip | Hover 看可调项；按 P 固定；漏色一键提取为变量 / Hover for adjustable props; press P to pin; missing colors get a one-click extract button |
-| 🌐 **可拖动工具栏 + 中 / EN 双显** | 工具栏可拖到任意位置；两种语言永远同时可见，激活态高亮 / Draggable toolbar; both languages always visible, active state highlighted |
-| 📤 **导出干净版** Export Clean | 一键剥离编辑器；inline `var()` 还原为 hex，剪贴到 Notion / 邮件不丢色 / One-click clean export; inline `var()` restored to hex (clipboard-safe) |
-| ✅ **20+ Sanity Checks** | 出错不输出文件，避免坏件 / Won't output broken files |
+| 🖱️ **就地文字编辑** Inline text editing | 点页面任何文字直接改，支持撤销 / Click any text to edit, with undo |
+| 🎨 **颜色面板** Color panel | 扫 DOM 实测用色：top 5 文字色 / top 4 背景 / top 3 边框。蓝主题红主题绿主题都自动适配 / Scans the DOM, ranks colors by actual usage — works for any theme |
+| 🔤 **字号面板** Font-size panel | ≤10 项滑块，分 3 组（标题 / 正文 / 辅助）/ ≤10 sliders auto-grouped into Heading / Body / Auxiliary |
+| 📐 **布局面板** Layout panel | 7 项：页面宽度 / 内距 / 段落宽 / **行高** / 章节间距 / 卡片间距 / 卡片内距 |
+| 🎭 **6 张风格 Prompt 卡** Style Prompts | 点击 → 把完整 prompt（色板 + 氛围 + 硬约束）复制给 AI，让 AI 重写整份 CSS / Click → copy a full style prompt to clipboard, paste to any AI |
+| 📌 **Pinned 元素弹窗** Pinned tooltip | Hover 看可调项；按 P 固定；漏色一键提取为变量 / Hover for props, press P to pin, missing colors → one-click extract |
+| 🌐 **可拖动工具栏 + 中 / EN 双显** | 工具栏可拖；两种语言永远同时可见，激活态高亮 / Draggable toolbar; both languages always visible |
+| 📤 **导出干净版** Export Clean | 一键剥离编辑器；inline `var()` 还原为 hex，剪贴到 Notion / 邮件不丢色 / One-click clean export; `var()` restored to hex (clipboard-safe) |
 
 ---
 
-## 📺 试一下 demo / Try the demo
+## 📺 看下 demo / See it in action
+
+让 AI 处理仓库自带的 demo（不需要你提供 HTML）/ Ask your agent to try the bundled demo:
+
+> 用 html-visual-editor 处理一下它仓库里的 `examples/demo-report.html`，给我看看效果
+> Use html-visual-editor on its bundled `examples/demo-report.html` and show me
+
+或者命令行 / Or directly:
 
 ```bash
 python scripts/adapt.py examples/demo-report.html --force
@@ -65,31 +108,13 @@ open examples/demo-report-editable.html
 
 ---
 
-## 🛠️ 作为 AI Agent Skill 安装 / Install as an AI Agent Skill
+## 📋 兼容性 / Compatibility
 
-This tool ships as a Skill for AI coding agents. 把整个仓库目录拷贝到你的 Agent skills 路径即可：
-
-```bash
-# 1. 先把仓库 clone 到本地 / Clone the repo
-git clone https://github.com/ytisvibecoding/html-visual-editor.git
-cd html-visual-editor
-
-# 2. 拷贝到你的 Agent skills 目录 / Copy to your agent's skills folder
-# WorkBuddy / CodeBuddy：
-mkdir -p ~/.workbuddy/skills/html-visual-editor && cp -r ./* ~/.workbuddy/skills/html-visual-editor/
-
-# Claude Code：
-mkdir -p ~/.claude/skills/html-visual-editor && cp -r ./* ~/.claude/skills/html-visual-editor/
-
-# Cursor / 其它 Agent：放到项目目录，在规则中引用 scripts/adapt.py / Place in project dir, reference scripts/adapt.py in your agent rules
-```
-
-然后用自然语言让 Agent 调它 / Then ask your agent in plain language:
-
-> "把这个 HTML 做成可编辑版" / "Make this HTML editable" / "Add a style panel to this page"
-
-也可以从 [ClawHub](https://clawhub.ai/) 等 skill 商店直接安装最新版。
-Also installable from skill marketplaces like ClawHub.
+| Level | 条件 / Condition | 结果 / Result |
+|---|---|---|
+| **A** ✅ | `<style>` + 5+ CSS 变量 / CSS variables in `:root` | 全自动效果最佳 / Full auto, best results |
+| **B** ⚠️ | 变量少 / 外链 CSS / Tailwind | 文字编辑 + 数据驱动颜色仍可用 / Text editing + data-driven colors still work |
+| **C** ⚠️ | inline style 主导 / Mostly inline styles | 文字编辑可用；建议先让 AI 把 inline 重构为 CSS 变量 / Text editing works; ask AI to refactor inline → vars first |
 
 ---
 
@@ -106,19 +131,9 @@ HTML ──► parse_css.py        抽取 CSS 变量 / font-size / 颜色 / 选�
 
 ---
 
-## 📋 兼容性 / Compatibility
-
-| Level | 条件 / Condition | 结果 / Result |
-|---|---|---|
-| **A** ✅ | `<style>` + 5+ CSS 变量 / `<style>` block with 5+ CSS variables in `:root` | 全自动效果最佳 / Full auto, best results |
-| **B** ⚠️ | 变量少 / 外链 CSS / Tailwind / Few vars, external CSS, Tailwind | 文字编辑 + 数据驱动颜色仍可用 / Text editing + data-driven colors still work |
-| **C** ⚠️ | inline style 主导 / Mostly inline styles | 文字编辑可用；建议先用 Style Prompt 让 AI 把 inline 重构为变量 / Text editing works; use Style Prompt to refactor inline → vars first |
-
----
-
 ## 🤖 LLM 增强标签（可选）/ Optional: LLM-enhanced labels
 
-不配置也能跑（启发式命名兜底）。配置后变量名更语义化。/ Works without any key (heuristic naming fallback); with a key, CSS variable labels become semantic.
+不配置也能跑（启发式命名兜底）。配置后变量名更语义化。/ Works without any key; with a key, CSS variable labels become semantic.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...   # 或 / or
@@ -149,7 +164,7 @@ PR 欢迎 / PRs welcome:
 
 ## 📦 Changelog
 
-完整版本历史请见 [GitHub Releases](https://github.com/ytisvibecoding/html-visual-editor/releases) / Full version history on [Releases](https://github.com/ytisvibecoding/html-visual-editor/releases).
+完整版本历史请见 [Releases](https://github.com/ytisvibecoding/html-visual-editor/releases) / Full version history on [Releases](https://github.com/ytisvibecoding/html-visual-editor/releases).
 
 <details>
 <summary>展开历史版本 / Expand history</summary>
@@ -195,7 +210,7 @@ PR 欢迎 / PRs welcome:
 - 对比度修正 / 渐变色提取 / 状态恢复
 
 ### v1.1.0 (2026-05-25)
-- `extract_solid_hex_to_vars()`：硬编码 hex 自动提取为 CSS 变量（颜色变量数 ~6 → ~30）
+- `extract_solid_hex_to_vars()`：硬编码 hex 自动提取为 CSS 变量
 - 滑块状态持久化 / 动态 PEM
 
 ### v1.0.0 (2026-05-24)
