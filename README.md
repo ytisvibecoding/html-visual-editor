@@ -43,10 +43,14 @@ Your agent will invoke this skill automatically; you'll get a `*-editable.html` 
 
 ### 选项 A：从 Skill 商店一键安装 / Install from a skill marketplace（推荐）
 
-- **[ClawHub](https://clawhub.ai/)** — 搜索 `html-visual-editor`，点 Install。
-- **CodeBuddy / WorkBuddy** — 在 skill marketplace 里搜索安装。
+- **[ClawHub](https://clawhub.ai/ytisvibecoding/html-editor)** — 直接打开链接，点 Install。/ Open the link and click Install.
+- **[SkillHub](https://skillhub.cn/skill/html-editor)** — 直接打开链接，点安装。/ Open the link and click Install.
+- **CodeBuddy / WorkBuddy** — 在 skill marketplace 里搜索 `html-editor` 安装。/ Search `html-editor` in the in-app marketplace.
+
+> 备注：商店里的名字是 `html-editor`（GitHub 仓库名是 `html-visual-editor`，对应同一个 skill）/ Note: the marketplace listing is `html-editor`; the GitHub repo is `html-visual-editor` — same skill.
 
 装完直接对 agent 说："**帮我把这个 HTML 做成可编辑版**"。
+After install, just say to your agent: "**Make this HTML editable.**"
 
 ### 选项 B：让 AI 帮你手动装 / Let your AI install it manually
 
